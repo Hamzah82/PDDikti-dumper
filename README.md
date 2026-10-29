@@ -22,11 +22,11 @@ pip install requests
 ## Cara Pakai
 
 ```bash
-# Cara dasar
-python3 pddikti_scraper.py "Awangku Muhammad Hamzah"
-
-# Mode interaktif (nama diminta lewat prompt)
+# Mode berulang (DEFAULT) — cari terus-menerus, Ctrl+C untuk keluar
 python3 pddikti_scraper.py
+
+# Sekali jalan: beri nama langsung sebagai argumen
+python3 pddikti_scraper.py "Awangku Muhammad Hamzah"
 
 # Tampilkan SEMUA hasil pencarian (bukan hanya yang 100% cocok)
 python3 pddikti_scraper.py "Awangku Muhammad" --all
@@ -34,6 +34,23 @@ python3 pddikti_scraper.py "Awangku Muhammad" --all
 # Keluarkan hasil sebagai JSON (untuk diproses program lain)
 python3 pddikti_scraper.py "Awangku Muhammad Hamzah" --json
 ```
+
+### Mode Berulang
+
+Tanpa argumen nama, tool masuk ke mode pencarian berulang:
+
+```
+Nama mahasiswa (Ctrl+C untuk keluar) > Awangku Muhammad Hamzah
+... hasil ditampilkan ...
+Nama mahasiswa (Ctrl+C untuk keluar) > Budi Santoso
+... hasil ditampilkan ...
+Nama mahasiswa (Ctrl+C untuk keluar) > ^C
+  Selesai. Total pencarian: 2
+```
+
+- **Ctrl+C** — keluar dari program
+- **`q`** / `exit` / `keluar` — cara lain untuk keluar
+- **Ctrl+C saat sedang mencari** — hanya membatalkan pencarian itu, bukan keluar
 
 ## Contoh Output
 

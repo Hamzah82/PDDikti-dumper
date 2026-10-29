@@ -306,6 +306,57 @@ def proses(nama_input: str, tampilkan_semua: bool = False,
     return 0
 
 
+def mode_loop(args: argparse.Namespace) -> int:
+    """Mode interaktif berulang: minta nama, cari, tampilkan, ulangi.
+
+    Keluar dengan Ctrl+C (atau Ctrl+D / ketik 'q' / 'exit' / 'keluar').
+    """
+    print(garis())
+    print("PDDikti Mahasiswa Scraper — Mode Pencarian Berulang".center(70))
+    print(garis())
+    print("  Ketik nama lengkap lalu tekan Enter untuk mencari.")
+    print("  Ketik 'q' atau tekan Ctrl+C untuk keluar.")
+    print(garis())
+    print()
+
+    jumlah_pencarian = 0
+
+    while True:
+        try:
+            nama = input("Nama mahasiswa (Ctrl+C untuk keluar) > ")
+        except (KeyboardInterrupt, EOFError):
+            print()
+            print(garis("-"))
+            print(f"  Selesai. Total pencarian: {jumlah_pencarian}")
+            print(garis("-"))
+            return 0
+
+        nama = nama.strip()
+
+        if not nama:
+            print("  (kosong, silakan isi nama)\n")
+            continue
+
+        if nama.lower() in ("q", "quit", "exit", "keluar"):
+            print()
+            print(garis("-"))
+            print(f"  Selesai. Total pencarian: {jumlah_pencarian}")
+            print(garis("-"))
+            return 0
+
+        jumlah_pencarian += 1
+        try:
+            proses(nama, tampilkan_semua=args.all, keluarkan_json=args.json)
+        except KeyboardInterrupt:
+            # Ctrl+C saat sedang mengambil data: batalkan pencarian ini, lanjut loop
+            print("\n  (pencarian dibatalkan)\n")
+            continue
+        except Exception as e:  # jangan sampai satu error mematikan loop
+            print(f"  Error tak terduga: {e}", file=sys.stderr)
+
+        print()
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Scrape data mahasiswa dari PDDikti berdasarkan nama lengkap.",
@@ -318,16 +369,14 @@ def main() -> int:
                         help="Keluarkan hasil dalam format JSON")
     args = parser.parse_args()
 
-    nama = args.nama
-    if not nama:
-        try:
-            nama = input("Masukkan nama lengkap mahasiswa: ")
-        except (EOFError, KeyboardInterrupt):
-            print("\nDibatalkan.")
-            return 130
-
     try:
-        return proses(nama, tampilkan_semua=args.all, keluarkan_json=args.json)
+        # Ada argumen nama -> sekali jalan (sekali pakai)
+        if args.nama:
+            return proses(args.nama, tampilkan_semua=args.all,
+                          keluarkan_json=args.json)
+
+        # Tanpa argumen -> mode berulang sampai Ctrl+C
+        return mode_loop(args)
     except KeyboardInterrupt:
         print("\nDibatalkan oleh pengguna.")
         return 130

@@ -1,13 +1,13 @@
 # PDDikti Mahasiswa Scraper 🐢
 
 Tool Python untuk mengambil data mahasiswa dari situs resmi **PDDikti**
-(Pangkalan Data Pendidikan Tinggi) berdasarkan **nama lengkap**.
+(Pangkalan Data Pendidikan Tinggi) berdasarkan **nama lengkap** atau **NIM**.
 
 Cara kerja singkat:
 
-1. Input nama lengkap → cari ke `https://pddikti.kemdiktisaintek.go.id/search/NAMA`
+1. Input nama lengkap **atau NIM** → cari ke `https://pddikti.kemdiktisaintek.go.id/search/QUERY`
 2. Ambil hasil pencarian dari API internal PDDikti
-3. Filter hasil yang namanya **100% sama** dengan input
+3. Filter hasil yang namanya (atau NIM-nya) **100% sama** dengan input
 4. Ambil data detail (setara tombol **"Lihat Detail"**) untuk setiap hasil yang cocok
 5. Tampilkan langsung di terminal
 
@@ -25,8 +25,9 @@ pip install requests
 # Mode berulang (DEFAULT) — cari terus-menerus, Ctrl+C untuk keluar
 python3 pddikti_scraper.py
 
-# Sekali jalan: beri nama langsung sebagai argumen
+# Sekali jalan: beri nama atau NIM langsung sebagai argumen
 python3 pddikti_scraper.py "Awangku Muhammad Hamzah"
+python3 pddikti_scraper.py 26081010214
 
 # Tampilkan SEMUA hasil pencarian (bukan hanya yang 100% cocok)
 python3 pddikti_scraper.py "Awangku Muhammad" --all
@@ -35,16 +36,33 @@ python3 pddikti_scraper.py "Awangku Muhammad" --all
 python3 pddikti_scraper.py "Awangku Muhammad Hamzah" --json
 ```
 
+### Auto-detect Nama vs NIM
+
+Tidak perlu memberi tahu tool mana yang Anda masukkan — dideteksi otomatis:
+
+- **Seluruhnya angka** → dianggap **NIM** (spasi/titik/strip diabaikan,
+  jadi `260 810 10214` dan `2608.1010214` tetap dianggap NIM)
+- **Mengandung huruf** → dianggap **nama**
+
+```bash
+python3 pddikti_scraper.py 26081010214            # dicari sebagai NIM
+python3 pddikti_scraper.py "Awangku Muhammad Hamzah"  # dicari sebagai nama
+```
+
+Catatan: pencarian NIM di PDDikti memakai pencocokan awalan, sehingga satu NIM
+bisa memunculkan banyak mahasiswa dengan NIM mirip. Tool ini menyaringnya
+supaya hanya NIM yang **persis sama** yang diambil datanya.
+
 ### Mode Berulang
 
 Tanpa argumen nama, tool masuk ke mode pencarian berulang:
 
 ```
-Nama mahasiswa (Ctrl+C untuk keluar) > Awangku Muhammad Hamzah
+Nama / NIM (Ctrl+C untuk keluar) > Awangku Muhammad Hamzah
 ... hasil ditampilkan ...
-Nama mahasiswa (Ctrl+C untuk keluar) > Budi Santoso
+Nama / NIM (Ctrl+C untuk keluar) > 26081010214
 ... hasil ditampilkan ...
-Nama mahasiswa (Ctrl+C untuk keluar) > ^C
+Nama / NIM (Ctrl+C untuk keluar) > ^C
   Selesai. Total pencarian: 2
 ```
 
@@ -105,6 +123,8 @@ ulang, server akan membalas `{"message":"invalid id"}`.
 ## Batasan
 
 - Nama harus diketik cukup lengkap; pencarian PDDikti berbasis kecocokan kata
+- NIM dicocokkan **persis**; jika yang dimasukkan bukan NIM utuh, tool akan
+  menampilkan daftar hasil yang mirip agar bisa diperiksa
 - Data yang tampil hanya yang dipublikasikan PDDikti
 - Mohon gunakan secara wajar dan hormati ketentuan layanan PDDikti
 

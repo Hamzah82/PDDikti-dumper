@@ -105,6 +105,27 @@ def nama_sama_persis(nama_api: str, nama_input: str) -> bool:
     return normalisasi(nama_api) == normalisasi(nama_input)
 
 
+def deteksi_mode(query: str) -> str:
+    """Deteksi apakah input berupa NIM (angka) atau nama.
+
+    Aturan: jika setelah dibersihkan (spasi/titik/strip dihapus) input
+    SELURUHNYA terdiri dari angka -> NIM. Selain itu -> nama.
+    """
+    bersih = re.sub(r"[\s.\-]", "", query)
+    if bersih and bersih.isdigit():
+        return "nim"
+    return "nama"
+
+
+def nim_sama_persis(nim_api: str, nim_input: str) -> bool:
+    """True jika NIM dari API 100% sama dengan input (setelah dibersihkan)."""
+    if not nim_api or not nim_input:
+        return False
+    bersih_api = re.sub(r"[\s.\-]", "", str(nim_api))
+    bersih_input = re.sub(r"[\s.\-]", "", str(nim_input))
+    return bersih_api == bersih_input
+
+
 def garis(char: str = "=", panjang: int = 70) -> str:
     return char * panjang
 
@@ -213,13 +234,17 @@ def tampilkan_detail(detail: Dict[str, Any], indeks: Optional[int] = None) -> No
     print(garis())
 
 
-def tampilkan_ringkasan(hasil: List[Dict[str, Any]], nama_input: str) -> None:
+def tampilkan_ringkasan(hasil: List[Dict[str, Any]], query_input: str) -> None:
     """Tampilkan tabel ringkas hasil pencarian."""
+    mode = deteksi_mode(query_input)
     print(garis("-"))
-    print(f"  Hasil pencarian mentah untuk: {nama_input}")
+    print(f"  Hasil pencarian mentah untuk: {query_input}")
     print(garis("-"))
     for i, item in enumerate(hasil, 1):
-        cocok = " [100% COCOK]" if nama_sama_persis(item.get("nama", ""), nama_input) else ""
+        if mode == "nim":
+            cocok = " [100% COCOK]" if nim_sama_persis(item.get("nim", ""), query_input) else ""
+        else:
+            cocok = " [100% COCOK]" if nama_sama_persis(item.get("nama", ""), query_input) else ""
         print(f"  {i}. {item.get('nama', '-')}{cocok}")
         print(f"     NIM   : {item.get('nim', '-')}")
         print(f"     PT    : {item.get('nama_pt', '-')}")
@@ -231,46 +256,57 @@ def tampilkan_ringkasan(hasil: List[Dict[str, Any]], nama_input: str) -> None:
 # Alur utama
 # ---------------------------------------------------------------------------
 
-def proses(nama_input: str, tampilkan_semua: bool = False,
+def proses(query_input: str, tampilkan_semua: bool = False,
            keluarkan_json: bool = False) -> int:
-    """Jalankan pencarian + ambil detail. Return exit code."""
-    nama_input = nama_input.strip()
-    if not nama_input:
-        print("Error: nama tidak boleh kosong.", file=sys.stderr)
+    """Jalankan pencarian + ambil detail. Return exit code.
+
+    Input bisa berupa NAMA LENGKAP atau NIM — dideteksi otomatis:
+    jika seluruhnya angka -> dicari sebagai NIM, selain itu -> sebagai nama.
+    """
+    query_input = query_input.strip()
+    if not query_input:
+        print("Error: input tidak boleh kosong.", file=sys.stderr)
         return 2
 
+    mode = deteksi_mode(query_input)
+    jenis = "NIM" if mode == "nim" else "nama"
     sesi = requests.Session()
 
     if not keluarkan_json:
-        print(f"\n[1/3] Mencari \"{nama_input}\" di PDDikti ...")
+        print(f"\n[1/3] Mencari {jenis} \"{query_input}\" di PDDikti ...")
 
     try:
-        hasil = cari_mahasiswa(nama_input, sesi)
+        hasil = cari_mahasiswa(query_input, sesi)
     except PddiktiError as e:
         print(f"Error: {e}", file=sys.stderr)
         return 1
 
     if not hasil:
         if not keluarkan_json:
-            print("Tidak ada mahasiswa yang ditemukan.")
+            print(f"Tidak ada mahasiswa dengan {jenis} tersebut.")
         else:
             print(json.dumps({"status": "empty", "data": []}, ensure_ascii=False, indent=2))
         return 0
 
-    # Filter: nama harus 100% sama dengan input
+    # Filter: nama / NIM harus 100% sama dengan input
     if tampilkan_semua:
         target = hasil
     else:
-        target = [h for h in hasil if nama_sama_persis(h.get("nama", ""), nama_input)]
+        if mode == "nim":
+            target = [h for h in hasil
+                      if nim_sama_persis(h.get("nim", ""), query_input)]
+        else:
+            target = [h for h in hasil
+                      if nama_sama_persis(h.get("nama", ""), query_input)]
 
     if not keluarkan_json:
         print(f"      Ditemukan {len(hasil)} hasil pencarian.")
         if not tampilkan_semua:
-            print(f"      Cocok 100% dengan input: {len(target)} data.")
+            print(f"      Cocok 100% dengan {jenis}: {len(target)} data.")
         if len(target) == 0:
-            print("\nTidak ada nama yang 100% sama dengan input.")
+            print(f"\nTidak ada {jenis} yang 100% sama dengan input.")
             print("Berikut hasil pencarian yang mirip:\n")
-            tampilkan_ringkasan(hasil, nama_input)
+            tampilkan_ringkasan(hasil, query_input)
 
     if not target:
         return 0
@@ -293,7 +329,7 @@ def proses(nama_input: str, tampilkan_semua: bool = False,
 
     if keluarkan_json:
         print(json.dumps(
-            {"status": "success", "query": nama_input, "data": semua_detail},
+            {"status": "success", "query": query_input, "data": semua_detail},
             ensure_ascii=False, indent=2,
         ))
         return 0
@@ -307,14 +343,14 @@ def proses(nama_input: str, tampilkan_semua: bool = False,
 
 
 def mode_loop(args: argparse.Namespace) -> int:
-    """Mode interaktif berulang: minta nama, cari, tampilkan, ulangi.
+    """Mode interaktif berulang: minta nama/NIM, cari, tampilkan, ulangi.
 
     Keluar dengan Ctrl+C (atau Ctrl+D / ketik 'q' / 'exit' / 'keluar').
     """
     print(garis())
     print("PDDikti Mahasiswa Scraper — Mode Pencarian Berulang".center(70))
     print(garis())
-    print("  Ketik nama lengkap lalu tekan Enter untuk mencari.")
+    print("  Ketik NAMA lengkap atau NIM lalu tekan Enter untuk mencari.")
     print("  Ketik 'q' atau tekan Ctrl+C untuk keluar.")
     print(garis())
     print()
@@ -323,7 +359,7 @@ def mode_loop(args: argparse.Namespace) -> int:
 
     while True:
         try:
-            nama = input("Nama mahasiswa (Ctrl+C untuk keluar) > ")
+            query = input("Nama / NIM (Ctrl+C untuk keluar) > ")
         except (KeyboardInterrupt, EOFError):
             print()
             print(garis("-"))
@@ -331,13 +367,13 @@ def mode_loop(args: argparse.Namespace) -> int:
             print(garis("-"))
             return 0
 
-        nama = nama.strip()
+        query = query.strip()
 
-        if not nama:
-            print("  (kosong, silakan isi nama)\n")
+        if not query:
+            print("  (kosong, silakan isi nama atau NIM)\n")
             continue
 
-        if nama.lower() in ("q", "quit", "exit", "keluar"):
+        if query.lower() in ("q", "quit", "exit", "keluar"):
             print()
             print(garis("-"))
             print(f"  Selesai. Total pencarian: {jumlah_pencarian}")
@@ -346,7 +382,7 @@ def mode_loop(args: argparse.Namespace) -> int:
 
         jumlah_pencarian += 1
         try:
-            proses(nama, tampilkan_semua=args.all, keluarkan_json=args.json)
+            proses(query, tampilkan_semua=args.all, keluarkan_json=args.json)
         except KeyboardInterrupt:
             # Ctrl+C saat sedang mengambil data: batalkan pencarian ini, lanjut loop
             print("\n  (pencarian dibatalkan)\n")
@@ -359,10 +395,11 @@ def mode_loop(args: argparse.Namespace) -> int:
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Scrape data mahasiswa dari PDDikti berdasarkan nama lengkap.",
+        description="Scrape data mahasiswa dari PDDikti berdasarkan nama lengkap atau NIM.",
         epilog='Contoh: python3 pddikti_scraper.py "Awangku Muhammad Hamzah"',
     )
-    parser.add_argument("nama", nargs="?", help="Nama lengkap mahasiswa")
+    parser.add_argument("query", nargs="?",
+                        help="Nama lengkap mahasiswa ATAU NIM (dideteksi otomatis)")
     parser.add_argument("--all", action="store_true",
                         help="Tampilkan semua hasil pencarian, bukan hanya yang 100%% cocok")
     parser.add_argument("--json", action="store_true",
@@ -370,9 +407,9 @@ def main() -> int:
     args = parser.parse_args()
 
     try:
-        # Ada argumen nama -> sekali jalan (sekali pakai)
-        if args.nama:
-            return proses(args.nama, tampilkan_semua=args.all,
+        # Ada argumen -> sekali jalan (sekali pakai)
+        if args.query:
+            return proses(args.query, tampilkan_semua=args.all,
                           keluarkan_json=args.json)
 
         # Tanpa argumen -> mode berulang sampai Ctrl+C

@@ -1,0 +1,26 @@
+# Byte-compiled
+__pycache__/
+*.py[cod]
+
+# Virtual env
+venv/
+.venv/
+env/
+
+# Build
+build/
+dist/
+*.egg-info/
+
+# Editor & OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Output scraping
+output/
+hasil_*.txt
+
+# Env & secrets
+.env
